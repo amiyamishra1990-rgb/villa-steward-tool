@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Villa Steward — AI Hygiene Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Tenor+Sans&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --black:#0a0a08;--deep:#111210;--card:#161714;--card2:#1c1c18;
+  --border:#2a2a26;--border2:#3a3a34;
+  --gold:#c9a84c;--gold-lt:#e2c97e;--gold-dim:#7a6328;--gold-bg:rgba(201,168,76,0.08);
+  --cream:#f5f0e8;--muted:#7a7870;--white:#fff;
+  --green:#3ecf80;--green-bg:rgba(62,207,128,0.1);
+  --red:#e05555;--red-bg:rgba(224,85,85,0.12);
+  --orange:#f09040;--orange-bg:rgba(240,144,64,0.1);
+  --blue:#5b9cf6;--blue-bg:rgba(91,156,246,0.1);
+}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;line-height:1.7;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 80% 10%,rgba(201,168,76,0.05),transparent 60%);pointer-events:none;z-index:0}
+
+.header{background:rgba(10,10,8,0.98);border-bottom:1px solid var(--border);padding:16px 20px;position:sticky;top:0;z-index:100}
+.hb-main{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--cream)}
+.hb-sub{font-family:'Tenor Sans',sans-serif;font-size:0.48rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-top:2px}
+
+/* API KEY SETUP */
+.setup-wrap{background:var(--card);border:1px solid var(--gold-dim);border-radius:8px;padding:20px;margin-bottom:24px}
+.setup-title{font-family:'Tenor Sans',sans-serif;font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+.setup-desc{font-size:0.8rem;color:var(--muted);margin-bottom:12px;line-height:1.7}
+.setup-input{background:var(--black);border:1.5px solid var(--border2);color:var(--cream);padding:11px 14px;font-family:'Jost',sans-serif;font-size:0.85rem;outline:none;width:100%;border-radius:4px;transition:border-color 0.2s}
+.setup-input:focus{border-color:var(--gold)}
+.setup-input::placeholder{color:var(--border2)}
+.setup-save{margin-top:10px;padding:10px 20px;font-family:'Tenor Sans',sans-serif;font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;background:var(--gold);color:var(--black);border:none;cursor:pointer;border-radius:3px;font-weight:700}
+.setup-status{font-size:0.75rem;margin-top:8px;padding:6px 10px;border-radius:3px;display:none}
+.status-ok{background:var(--green-bg);color:var(--green);border:1px solid rgba(62,207,128,0.3)}
+.status-err{background:var(--red-bg);color:var(--red);border:1px solid rgba(224,85,85,0.3)}
+
+.wrap{max-width:600px;margin:0 auto;padding:24px 16px;position:relative;z-index:1}
+
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;background:var(--card);border:1px solid var(--border);padding:4px;border-radius:6px;margin-bottom:24px}
+.mode-tab{font-family:'Tenor Sans',sans-serif;font-size:0.5rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:9px 4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.22s;border-radius:4px;text-align:center}
+.mode-tab.active{background:var(--gold);color:var(--black);font-weight:700}
+
+.upload-zone{border:2px dashed var(--border2);padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.22s;border-radius:8px;position:relative;background:var(--card);margin-bottom:12px}
+.upload-zone:hover{border-color:var(--gold-dim);background:var(--card2)}
+.upload-zone.has-image{border-color:var(--gold-dim);border-style:solid;padding:0;overflow:hidden}
+.uz-icon{font-size:1.8rem;margin-bottom:8px;opacity:0.5}
+.uz-label{font-family:'Tenor Sans',sans-serif;font-size:0.55rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:5px}
+.uz-sub{font-size:0.75rem;color:var(--muted);line-height:1.6}
+.uz-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.preview-img{width:100%;max-height:220px;object-fit:cover;display:block}
+.img-tag{font-family:'Tenor Sans',sans-serif;font-size:0.48rem;letter-spacing:0.18em;text-transform:uppercase;padding:4px 10px;border-radius:2px;display:inline-block;margin-bottom:6px}
+.before-tag{color:var(--red);border:1px solid rgba(224,85,85,0.3);background:var(--red-bg)}
+.after-tag{color:var(--green);border:1px solid rgba(62,207,128,0.3);background:var(--green-bg)}
+
+.area-wrap{margin-bottom:20px}
+.area-label{font-family:'Tenor Sans',sans-serif;font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:block}
+.area-chips{display:flex;gap:6px;flex-wrap:wrap}
+.area-chip{font-family:'Tenor Sans',sans-serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;border-radius:3px;transition:all 0.18s}
+.area-chip.active{background:var(--gold-bg);border-color:var(--gold-dim);color:var(--gold)}
+
+.analyse-btn{width:100%;padding:15px;font-family:'Tenor Sans',sans-serif;font-size:0.68rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;background:var(--gold);color:var(--black);border:none;cursor:pointer;transition:all 0.25s;border-radius:6px;margin-bottom:28px}
+.analyse-btn:hover:not(:disabled){background:var(--gold-lt)}
+.analyse-btn:disabled{opacity:0.45;cursor:not-allowed}
+
+.loading-wrap{display:none;text-align:center;padding:36px 20px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:20px}
+.loading-wrap.visible{display:block}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:'Tenor Sans',sans-serif;font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold)}
+.loading-sub{font-size:0.75rem;color:var(--muted);margin-top:5px}
+
+.results-wrap{display:none}
+.results-wrap.visible{display:block}
+
+.section-hdr{font-family:'Tenor Sans',sans-serif;font-size:0.52rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:10px;margin-bottom:14px;margin-top:24px}
+.section-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.risk-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:4px}
+.risk-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.risk-area{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--cream)}
+.risk-score{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:300;padding:6px 14px;border-radius:4px}
+.rs-critical{color:var(--red);background:var(--red-bg);border:1px solid rgba(224,85,85,0.3)}
+.rs-high{color:var(--orange);background:var(--orange-bg);border:1px solid rgba(240,144,64,0.3)}
+.rs-moderate{color:var(--gold);background:var(--gold-bg);border:1px solid var(--gold-dim)}
+.rs-low{color:var(--green);background:var(--green-bg);border:1px solid rgba(62,207,128,0.3)}
+.risk-bar-bg{height:7px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.risk-bar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.risk-scale{display:flex;justify-content:space-between;font-family:'Tenor Sans',sans-serif;font-size:0.44rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+.risk-summary{font-size:0.8rem;color:var(--muted);line-height:1.75;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+
+.threat-card{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px}
+.threat-card.high{border-left:3px solid var(--red)}
+.threat-card.medium{border-left:3px solid var(--orange)}
+.threat-card.low{border-left:3px solid var(--gold)}
+.threat-card.resolved{border-left:3px solid var(--green)}
+.th-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.th-icon{font-size:1.1rem;flex-shrink:0}
+.th-name{font-family:'Jost',sans-serif;font-size:0.8rem;font-weight:600;color:var(--cream);flex:1}
+.th-level{font-family:'Tenor Sans',sans-serif;font-size:0.42rem;letter-spacing:0.1em;text-transform:uppercase;padding:2px 7px;border-radius:2px;flex-shrink:0}
+.lv-high{color:var(--red);background:var(--red-bg);border:1px solid rgba(224,85,85,0.3)}
+.lv-medium{color:var(--orange);background:var(--orange-bg);border:1px solid rgba(240,144,64,0.3)}
+.lv-low{color:var(--gold);background:var(--gold-bg);border:1px solid var(--gold-dim)}
+.th-desc{font-size:0.77rem;color:var(--muted);line-height:1.65;margin-bottom:6px}
+.th-bacteria{font-size:0.72rem;color:#a78bfa;margin-bottom:6px}
+.th-health{font-size:0.72rem;color:var(--orange);border-top:1px solid var(--border);padding-top:6px}
+.th-resolved{font-size:0.72rem;color:var(--green);border-top:1px solid var(--border);padding-top:6px}
+
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+.comp-col{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px}
+.comp-col-title{font-family:'Tenor Sans',sans-serif;font-size:0.48rem;letter-spacing:0.15em;text-transform:uppercase;padding:4px 10px;border-radius:2px;display:inline-block;margin-bottom:10px}
+.comp-item{display:flex;gap:8px;font-size:0.75rem;color:var(--muted);margin-bottom:6px;line-height:1.55;align-items:flex-start}
+.comp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px}
+
+.wa-box{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:6px;padding:16px;margin-bottom:4px}
+.wa-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.wa-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream)}
+.wa-sub{font-size:0.68rem;color:var(--muted);margin-top:2px}
+.copy-btn{font-family:'Tenor Sans',sans-serif;font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--gold-dim);background:transparent;color:var(--gold);cursor:pointer;border-radius:2px;transition:all 0.18s;flex-shrink:0}
+.copy-btn:hover{background:var(--gold);color:var(--black)}
+.wa-text{font-size:0.79rem;color:var(--muted);line-height:1.9;white-space:pre-line}
+
+.reset-btn{width:100%;padding:13px;font-family:'Tenor Sans',sans-serif;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;border-radius:6px;margin-top:8px;transition:all 0.2s}
+.reset-btn:hover{border-color:var(--border2);color:var(--cream)}
+
+.history-item{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color 0.2s}
+.history-item:hover{border-color:var(--gold-dim)}
+.hi-area{font-family:'Tenor Sans',sans-serif;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);min-width:100px}
+.hi-score{font-family:'Cormorant Garamond',serif;font-size:1rem}
+.hi-time{font-size:0.7rem;color:var(--muted);flex:1}
+
+/* IMPROVEMENT BADGE */
+.improvement-badge{display:inline-flex;align-items:center;gap:6px;background:var(--green-bg);border:1px solid rgba(62,207,128,0.3);color:var(--green);padding:6px 14px;border-radius:4px;font-family:'Cormorant Garamond',serif;font-size:1.1rem;margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hb-main">The Villa Steward</div>
+  <div class="hb-sub">AI Hygiene Detector — Bacteria · Mold · Health Risk Analysis</div>
+</div>
+
+<div class="wrap">
+
+  <!-- API KEY SETUP -->
+  <div class="setup-wrap" id="setup-wrap">
+    <div class="setup-title">🔑 One-Time Setup — Claude API Key</div>
+    <div class="setup-desc">This tool uses Claude AI to analyse your property photos. You need a free Claude API key to use it.<br/><br/>
+      <strong style="color:var(--cream)">How to get your API key:</strong><br/>
+      1. Go to <strong style="color:var(--gold)">console.anthropic.com</strong> on your computer<br/>
+      2. Sign up free → Go to API Keys → Create Key<br/>
+      3. Copy the key (starts with sk-ant-...) and paste below<br/><br/>
+      <span style="color:var(--green)">Your key is saved only on this device. Never shared anywhere.</span>
+    </div>
+    <input type="password" class="setup-input" id="api-key-input" placeholder="sk-ant-api03-..."/>
+    <br/>
+    <button class="setup-save" onclick="saveApiKey()">Save Key and Start →</button>
+    <div class="setup-status" id="setup-status"></div>
+  </div>
+
+  <!-- MAIN APP (hidden until key saved) -->
+  <div id="app-wrap" style="display:none">
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('before')" id="tab-before">Before Clean</button>
+      <button class="mode-tab" onclick="setMode('compare')" id="tab-compare">Before vs After</button>
+      <button class="mode-tab" onclick="setMode('history')" id="tab-history">History</button>
+    </div>
+
+    <!-- BEFORE CLEAN -->
+    <div id="mode-before">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--cream);margin-bottom:6px">Upload dirty area photo</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">AI identifies bacteria, mold and health risks present — generates a client-ready report.</div>
+      <div class="upload-zone" id="before-zone">
+        <div class="uz-label">Before Clean Photo</div>
+        <div class="uz-icon">📷</div>
+        <div class="uz-sub">Tap to upload · Kitchen · Bathroom · Any area</div>
+        <input type="file" accept="image/*" capture="environment" class="uz-input" onchange="handleUpload(this,'before')"/>
+      </div>
+      <div class="area-wrap">
+        <span class="area-label">Area Type</span>
+        <div class="area-chips" id="chips-before"></div>
+      </div>
+      <button class="analyse-btn" id="btn-before" onclick="analyse('before')" disabled>🔬 Analyse Hygiene Risks →</button>
+    </div>
+
+    <!-- BEFORE VS AFTER -->
+    <div id="mode-compare" style="display:none">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--cream);margin-bottom:6px">Before and After Comparison</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">AI compares both images and shows exactly what was eliminated.</div>
+      <div class="img-tag before-tag">🔴 Before Clean</div>
+      <div class="upload-zone" id="comp-before-zone">
+        <div class="uz-icon">📷</div>
+        <div class="uz-sub">Upload before clean photo</div>
+        <input type="file" accept="image/*" capture="environment" class="uz-input" onchange="handleUpload(this,'comp-before')"/>
+      </div>
+      <div class="img-tag after-tag">🟢 After Clean</div>
+      <div class="upload-zone" id="comp-after-zone">
+        <div class="uz-icon">✨</div>
+        <div class="uz-sub">Upload after clean photo</div>
+        <input type="file" accept="image/*" capture="environment" class="uz-input" onchange="handleUpload(this,'comp-after')"/>
+      </div>
+      <div class="area-wrap">
+        <span class="area-label">Area Type</span>
+        <div class="area-chips" id="chips-compare"></div>
+      </div>
+      <button class="analyse-btn" id="btn-compare" onclick="analyse('compare')" disabled>🔬 Generate Comparison Report →</button>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="mode-history" style="display:none">
+      <div class="section-hdr">Recent Analyses</div>
+      <div id="history-list"></div>
+    </div>
+
+    <!-- LOADING -->
+    <div class="loading-wrap" id="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-text">AI Analysing Hygiene Conditions</div>
+      <div class="loading-sub" id="loading-sub">Identifying bacteria, mold and health risk factors...</div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results-wrap" id="results-wrap">
+      <div class="section-hdr">Hygiene Risk Assessment</div>
+      <div class="risk-box">
+        <div class="risk-top">
+          <div class="risk-area" id="res-area">—</div>
+          <div class="risk-score" id="res-score">—</div>
+        </div>
+        <div class="risk-bar-bg"><div class="risk-bar-fill" id="res-bar" style="width:0%"></div></div>
+        <div class="risk-scale"><span>Low</span><span>Moderate</span><span>High</span><span>Critical</span></div>
+        <div class="risk-summary" id="res-summary"></div>
+        <div id="improvement-wrap"></div>
+      </div>
+
+      <div class="section-hdr">Identified Threats</div>
+      <div id="threats-container"></div>
+
+      <div id="comp-section" style="display:none">
+        <div class="section-hdr">Before vs After</div>
+        <div class="comp-grid">
+          <div class="comp-col">
+            <div class="comp-col-title before-tag">🔴 Risks Found</div>
+            <div id="comp-before-items"></div>
+          </div>
+          <div class="comp-col">
+            <div class="comp-col-title after-tag">🟢 Resolved</div>
+            <div id="comp-after-items"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-hdr">Client WhatsApp Report</div>
+      <div class="wa-box">
+        <div class="wa-top">
+          <div>
+            <div class="wa-title">Ready to Send to Owner</div>
+            <div class="wa-sub">Copy and send on WhatsApp</div>
+          </div>
+          <button class="copy-btn" onclick="copyReport()">Copy</button>
+        </div>
+        <div class="wa-text" id="wa-text">—</div>
+      </div>
+
+      <button class="reset-btn" onclick="resetAll()">← Analyse Another Area</button>
+    </div>
+
+  </div><!-- end app-wrap -->
+</div>
+
+<script>
+const AREAS = ['Kitchen','Bathroom','Living Room','Bedroom','Terrace','Staircase','Window','Exhaust/Fan'];
+let currentMode = 'before';
+let selectedArea = 'Kitchen';
+let images = {before:null,'comp-before':null,'comp-after':null};
+let apiKey = '';
+let history = [];
+
+// INIT
+document.addEventListener('DOMContentLoaded', () => {
+  // Always show setup first - try to load saved key
+  try { 
+    const saved = localStorage.getItem('tvs_api_key');
+    if(saved && saved.startsWith('sk-ant')) {
+      apiKey = saved;
+      document.getElementById('api-key-input').value = saved;
+      document.getElementById('setup-status').textContent = 'Saved key loaded. You can proceed or update it.';
+      document.getElementById('setup-status').className = 'setup-status status-ok';
+      document.getElementById('setup-status').style.display = 'block';
+    }
+  } catch(e){}
+  try { history = JSON.parse(localStorage.getItem('tvs_hygiene_history')||'[]'); } catch(e){}
+  // Always show setup screen first so user can verify key
+  document.getElementById('setup-wrap').style.display = 'block';
+  document.getElementById('app-wrap').style.display = 'none';
+  buildChips('chips-before');
+  buildChips('chips-compare');
+});
+
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const status = document.getElementById('setup-status');
+  if(!key || key.length < 20) {
+    status.textContent = 'Please enter your complete API key.';
+    status.className = 'setup-status status-err';
+    status.style.display = 'block';
+    return;
+  }
+  apiKey = key;
+  try { localStorage.setItem('tvs_api_key', key); } catch(e){
+    // localStorage not available (file:// mode) - key held in memory only for this session
+  }
+  status.textContent = 'Key saved. Opening tool now...';
+  status.className = 'setup-status status-ok';
+  status.style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('setup-wrap').style.display = 'none';
+    document.getElementById('app-wrap').style.display = 'block';
+  }, 800);
+}
+
+function buildChips(containerId) {
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = '';
+  AREAS.forEach((a, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'area-chip' + (i===0?' active':'');
+    btn.textContent = a;
+    btn.onclick = () => {
+      document.querySelectorAll('#'+containerId+' .area-chip').forEach(c=>c.classList.remove('active'));
+      btn.classList.add('active');
+      selectedArea = a;
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  ['before','compare','history'].forEach(m => {
+    document.getElementById('mode-'+m).style.display = m===mode?'block':'none';
+    document.getElementById('tab-'+m).classList.toggle('active', m===mode);
+  });
+  document.getElementById('loading-wrap').classList.remove('visible');
+  document.getElementById('results-wrap').classList.remove('visible');
+  if(mode==='history') renderHistory();
+}
+
+function handleUpload(input, key) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    images[key] = e.target.result;
+    const zoneId = key==='before'?'before-zone':key+'-zone';
+    const zone = document.getElementById(zoneId);
+    const oldInput = zone.querySelector('input');
+    zone.innerHTML = `<img src="${e.target.result}" class="preview-img"/>`;
+    zone.classList.add('has-image');
+    const newInput = document.createElement('input');
+    newInput.type='file';newInput.accept='image/*';newInput.className='uz-input';
+    newInput.setAttribute('capture','environment');
+    newInput.onchange = function(){handleUpload(this,key);};
+    zone.appendChild(newInput);
+    updateBtns();
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateBtns() {
+  document.getElementById('btn-before').disabled = !images.before;
+  document.getElementById('btn-compare').disabled = !images['comp-before']||!images['comp-after'];
+}
+
+async function analyse(mode) {
+  if(!apiKey) { alert('Please add your Claude API key first.'); return; }
+  document.getElementById('loading-wrap').classList.add('visible');
+  document.getElementById('results-wrap').classList.remove('visible');
+
+  const msgs = ['Identifying bacteria and pathogen indicators...','Analysing mold and fungal conditions...','Assessing health risk factors...','Generating hygiene risk score...','Preparing client WhatsApp report...'];
+  let mi=0;
+  const iv = setInterval(()=>{ document.getElementById('loading-sub').textContent=msgs[mi++%msgs.length]; },1800);
+
+  try {
+    let content, isCompare = mode==='compare';
+
+    if(!isCompare) {
+      const b64 = images.before.split(',')[1];
+      const mt = images.before.split(';')[0].split(':')[1];
+      content = [
+        {type:"image",source:{type:"base64",media_type:mt,data:b64}},
+        {type:"text",text:buildPrompt('before',selectedArea)}
+      ];
+    } else {
+      const bb64 = images['comp-before'].split(',')[1];
+      const bmt = images['comp-before'].split(';')[0].split(':')[1];
+      const ab64 = images['comp-after'].split(',')[1];
+      const amt = images['comp-after'].split(';')[0].split(':')[1];
+      content = [
+        {type:"image",source:{type:"base64",media_type:bmt,data:bb64}},
+        {type:"image",source:{type:"base64",media_type:amt,data:ab64}},
+        {type:"text",text:buildPrompt('compare',selectedArea)}
+      ];
+    }
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-ipc":"true"},
+      body:JSON.stringify({model:"claude-opus-4-6",max_tokens:1500,messages:[{role:"user",content}]})
+    });
+
+    clearInterval(iv);
+    document.getElementById('loading-wrap').classList.remove('visible');
+
+    if(!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || 'API error '+resp.status);
+    }
+
+    const data = await resp.json();
+    const raw = data.content[0].text;
+    const match = raw.match(/\{[\s\S]*\}/);
+    if(!match) throw new Error('Could not parse AI response');
+    const result = JSON.parse(match[0]);
+    renderResults(result, isCompare);
+    saveHistory(result, isCompare);
+
+  } catch(err) {
+    clearInterval(iv);
+    document.getElementById('loading-wrap').classList.remove('visible');
+    let msg = 'Analysis failed.\n\n';
+    if(err.message.includes('401')) msg += 'Invalid API key. Please check your key in setup.';
+    else if(err.message.includes('429')) msg += 'Too many requests. Wait a minute and try again.';
+    else if(err.message.includes('fetch')) msg += 'Network error. Make sure you are connected to the internet and open this file in Chrome browser.';
+    else msg += err.message;
+    alert(msg);
+  }
+}
+
+function buildPrompt(type, area) {
+  if(type==='before') {
+    return `You are a hygiene and microbiology expert for The Villa Steward, a premium property management company in Bengaluru, India.
+
+Analyse this image of a ${area} BEFORE cleaning. Return ONLY valid JSON, no other text:
+
+{
+  "riskScore": <0-100, 0=clean, 100=critical>,
+  "riskLevel": "<Low|Moderate|High|Critical>",
+  "overallSummary": "<2 sentences about overall hygiene condition>",
+  "threats": [
+    {
+      "name": "<threat name>",
+      "severity": "<High|Medium|Low>",
+      "icon": "<one emoji>",
+      "description": "<what is visible, 1-2 sentences>",
+      "likelyBacteria": "<specific bacteria or pathogens likely present>",
+      "healthRisk": "<health risk to residents, 1 sentence>"
+    }
+  ],
+  "clientMessage": "<WhatsApp message from The Villa Steward to owner. Start: Namaste Ji. Describe findings, health risks, reassure will be resolved. 120-150 words. End: Warm regards, The Villa Steward, Bengaluru.>"
+}
+
+If image appears clean, give low risk score and minimal threats. Be accurate to what is actually visible.`;
+  } else {
+    return `You are a hygiene expert for The Villa Steward, Bengaluru. You see TWO images: Image 1 = BEFORE cleaning, Image 2 = AFTER cleaning of the same ${area}.
+
+Return ONLY valid JSON:
+
+{
+  "beforeRiskScore": <0-100>,
+  "afterRiskScore": <0-100>,
+  "riskLevel": "<risk level of before image>",
+  "improvementPercent": <0-100>,
+  "overallSummary": "<2 sentences about transformation achieved>",
+  "threatsFound": [
+    {
+      "name": "<threat in before image>",
+      "severity": "<High|Medium|Low>",
+      "icon": "<emoji>",
+      "description": "<what was visible>",
+      "likelyBacteria": "<bacteria present>",
+      "healthRisk": "<health risk>",
+      "resolved": true
+    }
+  ],
+  "beforeRisks": ["<risk 1>","<risk 2>","<risk 3>"],
+  "afterStatus": ["<resolved item 1>","<resolved item 2>","<resolved item 3>"],
+  "remainingConcerns": [],
+  "clientMessage": "<WhatsApp from The Villa Steward. Start: Namaste Ji. Describe risks found, what was eliminated, improvement achieved. Professional and reassuring. 130-160 words. End: Warm regards, The Villa Steward, Bengaluru.>"
+}`;
+  }
+}
+
+function renderResults(r, isCompare) {
+  const rw = document.getElementById('results-wrap');
+  rw.classList.add('visible');
+
+  const score = isCompare ? r.beforeRiskScore : r.riskScore;
+  const level = r.riskLevel||'Moderate';
+
+  document.getElementById('res-area').textContent = selectedArea + ' — ' + (isCompare?'Before vs After':'Before Clean');
+  const scoreBadge = document.getElementById('res-score');
+  scoreBadge.textContent = score+'/100';
+  scoreBadge.className = 'risk-score ' + (score>=70?'rs-critical':score>=50?'rs-high':score>=25?'rs-moderate':'rs-low');
+
+  const bar = document.getElementById('res-bar');
+  bar.style.width = score+'%';
+  bar.style.background = score>=70?'var(--red)':score>=50?'var(--orange)':score>=25?'var(--gold)':'var(--green)';
+
+  document.getElementById('res-summary').textContent = r.overallSummary||'';
+
+  const impWrap = document.getElementById('improvement-wrap');
+  if(isCompare && r.improvementPercent) {
+    impWrap.innerHTML = `<div class="improvement-badge">✓ ${r.improvementPercent}% improvement after cleaning</div>`;
+  } else { impWrap.innerHTML=''; }
+
+  const threats = r.threats||r.threatsFound||[];
+  const tc = document.getElementById('threats-container');
+  tc.innerHTML='';
+  threats.forEach(t=>{
+    const d=document.createElement('div');
+    const lvClass=t.severity==='High'?'high':t.severity==='Medium'?'medium':'low';
+    const lvStyle=t.severity==='High'?'lv-high':t.severity==='Medium'?'lv-medium':'lv-low';
+    d.className='threat-card '+lvClass+(t.resolved?' resolved':'');
+    d.innerHTML=`
+      <div class="th-top">
+        <div class="th-icon">${t.icon||'🦠'}</div>
+        <div class="th-name">${t.name}</div>
+        <div class="th-level ${lvStyle}">${t.severity}</div>
+      </div>
+      <div class="th-desc">${t.description}</div>
+      ${t.likelyBacteria?`<div class="th-bacteria">🔬 ${t.likelyBacteria}</div>`:''}
+      ${t.resolved?`<div class="th-resolved">✓ Eliminated after cleaning</div>`:`<div class="th-health">⚠ ${t.healthRisk}</div>`}
+    `;
+    tc.appendChild(d);
+  });
+
+  const cs = document.getElementById('comp-section');
+  if(isCompare){
+    cs.style.display='block';
+    const bi=document.getElementById('comp-before-items');
+    const ai=document.getElementById('comp-after-items');
+    bi.innerHTML='';ai.innerHTML='';
+    (r.beforeRisks||[]).forEach(x=>{const d=document.createElement('div');d.className='comp-item';d.innerHTML=`<div class="comp-dot" style="background:var(--red)"></div><span>${x}</span>`;bi.appendChild(d);});
+    (r.afterStatus||[]).forEach(x=>{const d=document.createElement('div');d.className='comp-item';d.innerHTML=`<div class="comp-dot" style="background:var(--green)"></div><span>${x}</span>`;ai.appendChild(d);});
+    if(r.remainingConcerns&&r.remainingConcerns.length){
+      const n=document.createElement('div');n.style.cssText='margin-top:8px;padding:8px 10px;background:var(--orange-bg);border-radius:4px;font-size:0.73rem;color:var(--orange)';
+      n.textContent='Still needs attention: '+r.remainingConcerns.join(', ');ai.appendChild(n);
+    }
+  } else { cs.style.display='none'; }
+
+  document.getElementById('wa-text').textContent=r.clientMessage||'—';
+  rw.scrollIntoView({behavior:'smooth'});
+}
+
+function saveHistory(r, isCompare) {
+  history.unshift({id:Date.now(),area:selectedArea,isCompare,score:isCompare?r.beforeRiskScore:r.riskScore,afterScore:r.afterRiskScore||null,level:r.riskLevel,time:new Date().toLocaleString('en-IN'),result:r});
+  if(history.length>15) history.pop();
+  try{localStorage.setItem('tvs_hygiene_history',JSON.stringify(history));}catch(e){}
+}
+
+function renderHistory() {
+  const list=document.getElementById('history-list');
+  if(!history.length){list.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:0.82rem">No analyses yet. Run your first scan to see history here.</div>';return;}
+  list.innerHTML='';
+  history.forEach(item=>{
+    const d=document.createElement('div');d.className='history-item';
+    const sc=item.score>=70?'var(--red)':item.score>=50?'var(--orange)':item.score>=25?'var(--gold)':'var(--green)';
+    d.innerHTML=`<div class="hi-area">${item.area}</div><div class="hi-score" style="color:${sc}">${item.score}/100</div>${item.afterScore!==null?`<div style="font-size:0.76rem;color:var(--green)">→ ${item.afterScore}/100</div>`:''}<div class="hi-time">${item.time}</div>`;
+    d.onclick=()=>{renderResults(item.result,item.isCompare);document.getElementById('results-wrap').scrollIntoView({behavior:'smooth'});};
+    list.appendChild(d);
+  });
+}
+
+function copyReport(){
+  navigator.clipboard.writeText(document.getElementById('wa-text').textContent).then(()=>{
+    const b=document.querySelector('.copy-btn');b.textContent='Copied ✓';setTimeout(()=>b.textContent='Copy',2200);
+  }).catch(()=>{
+    const t=document.getElementById('wa-text');const r=document.createRange();r.selectNode(t);window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand('copy');
+    const b=document.querySelector('.copy-btn');b.textContent='Copied ✓';setTimeout(()=>b.textContent='Copy',2200);
+  });
+}
+
+function resetAll(){
+  images={before:null,'comp-before':null,'comp-after':null};
+  document.getElementById('results-wrap').classList.remove('visible');
+  document.getElementById('loading-wrap').classList.remove('visible');
+  ['before','comp-before','comp-after'].forEach(key=>{
+    const id=key==='before'?'before-zone':key+'-zone';
+    const z=document.getElementById(id);
+    if(!z)return;
+    const isAfter=key==='comp-after';
+    z.innerHTML=`<div class="uz-icon">${isAfter?'✨':'📷'}</div><div class="uz-sub">${key==='before'?'Tap to upload · Kitchen · Bathroom · Any area':isAfter?'Upload after clean photo':'Upload before clean photo'}</div><input type="file" accept="image/*" capture="environment" class="uz-input" onchange="handleUpload(this,'${key}')"/>`;
+    z.classList.remove('has-image');
+  });
+  updateBtns();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>
